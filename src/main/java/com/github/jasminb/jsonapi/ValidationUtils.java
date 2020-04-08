@@ -54,7 +54,7 @@ public class ValidationUtils {
 	 * identifier objects, or an empty array.
 	 */
 	public static void ensurePrimaryDataValidArray(JsonNode dataNode) {
-		if (!isArrayOfResourceObjects(dataNode) && !isArrayOfResourceIdentifierObjects(dataNode)) {
+		if (!isArrayOfPrimaryResourceObjects(dataNode) && !isArrayOfResourceIdentifierObjects(dataNode)) {
 			throw new InvalidJsonApiResourceException("Primary data must be an array of resource objects, an array of resource identifier objects, or an empty array ([])");
 		}
 	}
@@ -66,7 +66,7 @@ public class ValidationUtils {
 	 * @throws InvalidJsonApiResourceException is thrown when 'DATA' node is not valid object, null or null node.
 	 */
 	public static void ensurePrimaryDataValidObjectOrNull(JsonNode dataNode) {
-		if (!isValidObject(dataNode) && isNotNullNode(dataNode)) {
+		if (!isPrimaryResourceObject(dataNode) && isNotNullNode(dataNode)) {
 			throw new InvalidJsonApiResourceException("Primary data must be either a single resource object, a single resource identifier object, or null");
 		}
 	}
@@ -134,6 +134,21 @@ public class ValidationUtils {
 	}
 
 	/**
+	 * Returns <code>true</code> for a primary 'DATA' node. Note that a primary node may NOT contain a `TYPE` attr.
+	 *
+	 * @param dataNode resource object data node
+	 * @return <code>true</code> if node has required attributes and all provided attributes are valid, else <code>false</code>
+	 */
+	public static boolean isPrimaryResourceObject(JsonNode dataNode) {
+		return dataNode != null && dataNode.isObject() &&
+				hasValueOrNull(dataNode, JSONAPISpecConstants.ID) &&
+				hasContainerOrNull(dataNode, JSONAPISpecConstants.META) &&
+				hasContainerNode(dataNode, JSONAPISpecConstants.ATTRIBUTES) &&
+				hasContainerOrNull(dataNode, JSONAPISpecConstants.LINKS) &&
+				hasContainerOrNull(dataNode, JSONAPISpecConstants.RELATIONSHIPS);
+	}
+
+	/**
 	 * Returns <code>true</code> in case 'DATA' node has array of valid Resource Objects.
 	 *
 	 * @param dataNode resource object array data node
@@ -151,8 +166,21 @@ public class ValidationUtils {
 		return false;
 	}
 
+	public static boolean isArrayOfPrimaryResourceObjects(JsonNode dataNode) {
+		if (dataNode != null && dataNode.isArray()) {
+			for (JsonNode element : dataNode) {
+				if (!isPrimaryResourceObject(element)) {
+					return false;
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
 	/**
-	 * Returns <code>true</code> in case 'DATA' node has array of valid Resource Identifier Objects.
+	 * Returns <code>true</code> for a primary 'DATA' node which contains an array of valid Resource Identifier Objects.
+	 * Note that a primary node may NOT contain a `TYPE` attr.
 	 *
 	 * @param dataNode resource identifier object array data node
 	 * @return <code>true</code> if node is empty array or contains only valid Resource Identifier Objects
