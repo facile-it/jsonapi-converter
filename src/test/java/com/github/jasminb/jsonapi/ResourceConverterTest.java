@@ -6,26 +6,8 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.github.jasminb.jsonapi.exceptions.DocumentSerializationException;
 import com.github.jasminb.jsonapi.exceptions.InvalidJsonApiResourceException;
 import com.github.jasminb.jsonapi.exceptions.UnregisteredTypeException;
-import com.github.jasminb.jsonapi.models.Article;
-import com.github.jasminb.jsonapi.models.Author;
-import com.github.jasminb.jsonapi.models.Car;
-import com.github.jasminb.jsonapi.models.Comment;
-import com.github.jasminb.jsonapi.models.Dealership;
-import com.github.jasminb.jsonapi.models.IntegerIdResource;
-import com.github.jasminb.jsonapi.models.LongIdResource;
-import com.github.jasminb.jsonapi.models.NoDefaultConstructorClass;
-import com.github.jasminb.jsonapi.models.NoIdAnnotationModel;
-import com.github.jasminb.jsonapi.models.RecursingNode;
-import com.github.jasminb.jsonapi.models.SimpleMeta;
-import com.github.jasminb.jsonapi.models.Status;
-import com.github.jasminb.jsonapi.models.User;
-import com.github.jasminb.jsonapi.models.inheritance.BaseModel;
-import com.github.jasminb.jsonapi.models.inheritance.City;
-import com.github.jasminb.jsonapi.models.inheritance.Engineer;
-import com.github.jasminb.jsonapi.models.inheritance.EngineeringField;
-import com.github.jasminb.jsonapi.models.inheritance.Movie;
-import com.github.jasminb.jsonapi.models.inheritance.Video;
-import com.github.jasminb.jsonapi.models.inheritance.Vod;
+import com.github.jasminb.jsonapi.models.*;
+import com.github.jasminb.jsonapi.models.inheritance.*;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -36,11 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
@@ -268,13 +246,12 @@ public class ResourceConverterTest {
 	}
 
 	@Test
-	public void testReadCollectionInvalidItem() throws IOException {
+	public void testReadCollectionWithNoTypeOnPrimaryResources() throws IOException {
 		InputStream apiResponse = IOUtils.getResource("missing-type-collection.json");
 
-		thrown.expect(InvalidJsonApiResourceException.class);
-		thrown.expectMessage("Primary data must be an array of resource objects, an array of resource identifier objects, or an empty array ([])");
+		List<User> result = converter.readDocumentCollection(apiResponse, User.class).get();
 
-		converter.readDocumentCollection(apiResponse, User.class);
+		assertEquals("liz", result.get(0).name);
 	}
 
 	@Test
@@ -370,7 +347,7 @@ public class ResourceConverterTest {
 	@Test
 	public void testReadPolymorphicRelationships() throws IOException {
 		ResourceConverter carConverter = new ResourceConverter("https://api.example.com", Car.class, Dealership.class);
-				InputStream apiResponse = IOUtils.getResource("cars.json");
+		InputStream apiResponse = IOUtils.getResource("cars.json");
 
 		JSONAPIDocument<Dealership> dealershipDocument = carConverter.readDocument(apiResponse, Dealership.class);
 		assertNotNull(dealershipDocument.get().getAutomobiles());
@@ -472,7 +449,7 @@ public class ResourceConverterTest {
 	 * values are mapped to Java {@code null}, and not to a string value representing {@code null} (which is the
 	 * default behavior of the Jackson {@code NullNode}).
 	 * @throws Exception
-     */
+	 */
 	@Test
 	public void testGetLinkNullity() throws Exception {
 		ObjectMapper mapper = new ObjectMapper();
@@ -839,13 +816,12 @@ public class ResourceConverterTest {
 	}
 
 	@Test
-	public void testInvalidDataMissingType() throws IOException {
+	public void testInvalidPrimaryDataWithNoType() throws IOException {
 		InputStream apiResponse = IOUtils.getResource("missing-type.json");
 
-        thrown.expect(InvalidJsonApiResourceException.class);
-		thrown.expectMessage("Primary data must be either a single resource object, a single resource identifier object, or null");
+		User result = converter.readDocument(apiResponse, User.class).get();
 
-		converter.readDocument(apiResponse, User.class);
+		assertEquals("liz", result.name);
 	}
 
 	@Test
