@@ -11,20 +11,37 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.fasterxml.jackson.databind.type.MapType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.ATTRIBUTES;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.DATA;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.ERRORS;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.HREF;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.ID;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.INCLUDED;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.LINKS;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.META;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.RELATED;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.RELATIONSHIPS;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.SELF;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.TYPE;
 import com.github.jasminb.jsonapi.annotations.Relationship;
 import com.github.jasminb.jsonapi.annotations.Type;
 import com.github.jasminb.jsonapi.exceptions.DocumentSerializationException;
 import com.github.jasminb.jsonapi.exceptions.UnregisteredTypeException;
 import com.github.jasminb.jsonapi.models.errors.Error;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.*;
-
-import static com.github.jasminb.jsonapi.JSONAPISpecConstants.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * JSON API data converter. <br />
