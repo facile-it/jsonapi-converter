@@ -11,12 +11,23 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.fasterxml.jackson.databind.type.MapType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.ATTRIBUTES;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.DATA;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.ERRORS;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.HREF;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.ID;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.INCLUDED;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.LINKS;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.META;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.RELATED;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.RELATIONSHIPS;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.SELF;
+import static com.github.jasminb.jsonapi.JSONAPISpecConstants.TYPE;
 import com.github.jasminb.jsonapi.annotations.Relationship;
 import com.github.jasminb.jsonapi.annotations.Type;
 import com.github.jasminb.jsonapi.exceptions.DocumentSerializationException;
 import com.github.jasminb.jsonapi.exceptions.UnregisteredTypeException;
 import com.github.jasminb.jsonapi.models.errors.Error;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,8 +42,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import static com.github.jasminb.jsonapi.JSONAPISpecConstants.*;
 
 /**
  * JSON API data converter. <br />
@@ -137,14 +146,16 @@ public class ResourceConverter {
 			}
 		}
 	}
+
 	/**
-	* Converts raw data input into requested target type.
-	* @param data raw data
-	* @param clazz target object
-	* @param <T> type
-	* @return converted object
-	* @throws RuntimeException in case conversion fails
-	*/
+	 * Converts raw data input into requested target type.
+	 *
+	 * @param data  raw data
+	 * @param clazz target object
+	 * @param <T>   type
+	 * @return converted object
+	 * @throws RuntimeException in case conversion fails
+	 */
 	@Deprecated
 	public <T> T readObject(byte [] data, Class<T> clazz) {
 		return readDocument(data, clazz).get();
@@ -199,13 +210,13 @@ public class ResourceConverter {
 			boolean cached = false;
 
 			if (ValidationUtils.isNotNullNode(dataNode)) {
-				String identifier = createIdentifier(dataNode);
+				String identifier = createIdentifierForPrimaryObject(dataNode);
 				cached = resourceCache.contains(identifier);
 
 				if (cached) {
 					resourceObject = (T) resourceCache.get(identifier);
 				} else {
-					resourceObject = readObject(dataNode, clazz, false);
+					resourceObject = readObject(dataNode, clazz, false, identifier);
 				}
 			}
 
@@ -273,7 +284,8 @@ public class ResourceConverter {
 			List<T> resourceList = new ArrayList<>();
 
 			for (JsonNode element : dataNode) {
-				T pojo = readObject(element, clazz, false);
+				String identifier = createIdentifierForPrimaryObject(element);
+				T pojo = readObject(element, clazz, false, identifier);
 				resourceList.add(pojo);
 			}
 
@@ -311,17 +323,16 @@ public class ResourceConverter {
 
 	/**
 	 * Converts provided input into a target object. After conversion completes any relationships defined are resolved.
+	 *
 	 * @param source JSON source
-	 * @param clazz target type
-	 * @param <T> type
+	 * @param clazz  target type
+	 * @param <T>    type
 	 * @return converted target object
 	 * @throws IOException
 	 * @throws IllegalAccessException
 	 */
-	private <T> T readObject(JsonNode source, Class<T> clazz, boolean handleRelationships)
+	private <T> T readObject(JsonNode source, Class<T> clazz, boolean handleRelationships, String identifier)
 			throws IOException, IllegalAccessException, InstantiationException {
-		String identifier = createIdentifier(source);
-
 		T result = (T) resourceCache.get(identifier);
 		if (result == null) {
 			Class<?> type = getActualType(source, clazz);
@@ -398,9 +409,9 @@ public class ResourceConverter {
 					// Handle relationships
 					JsonNode node = includedArray.get(i);
 					Object resourceObject = includedResources.get(createIdentifier(node));
-						if (resourceObject != null){
-							handleRelationships(node, resourceObject);
-						}
+					if (resourceObject != null){
+						handleRelationships(node, resourceObject);
+					}
 				}
 			}
 		}
@@ -425,7 +436,8 @@ public class ResourceConverter {
 			String type = jsonNode.get(TYPE).asText();
 			Class<?> clazz = configuration.getTypeClass(type);
 			if (clazz != null) {
-				Object object = readObject(jsonNode, clazz, false);
+				String identifier = createIdentifier(jsonNode);
+				Object object = readObject(jsonNode, clazz, false, identifier);
 				if (object != null) {
 					result.put(createIdentifier(jsonNode), object);
 				}
@@ -519,7 +531,7 @@ public class ResourceConverter {
 							relationshipField.set(object, elements);
 						} else {
 							try {
-							Object relationshipObject = parseRelationship(relationship.get(DATA), type);
+								Object relationshipObject = parseRelationship(relationship.get(DATA), type);
 								if (relationshipObject != null) {
 									relationshipField.set(object, relationshipObject);
 								}
@@ -578,7 +590,7 @@ public class ResourceConverter {
 				// Never cache relationship objects
 				resourceCache.lock();
 				try {
-					return readObject(relationshipDataNode, type, true);
+					return readObject(relationshipDataNode, type, true, identifier);
 				} finally {
 					resourceCache.unlock();
 				}
@@ -608,8 +620,32 @@ public class ResourceConverter {
 	}
 
 	/**
+	 * Generates unique resource identifier for a primary object node by combining resource type and resource id fields.
+	 *
+	 * @param object data object
+	 * @return concatenated id and type values if the node has a type, just its id otherwise.
+	 */
+	private String createIdentifierForPrimaryObject(JsonNode object) {
+		JsonNode idNode = object.get(ID);
+
+		String id = idNode != null ? idNode.asText().trim() : "";
+
+		if (id.isEmpty() && deserializationFeatures.contains(DeserializationFeature.REQUIRE_RESOURCE_ID)) {
+			throw new IllegalArgumentException(String.format("Resource must have a non null and non-empty 'id' attribute! %s", object.toString()));
+		}
+
+		if (object.has(TYPE)) {
+			String type = object.get(TYPE).asText();
+			return type.concat(id);
+		} else {
+			return id;
+		}
+	}
+
+	/**
 	 * Sets an id attribute value to a target object.
-	 * @param target target POJO
+	 *
+	 * @param target  target POJO
 	 * @param idValue id node
 	 * @throws IllegalAccessException thrown in case target field is not accessible
 	 */
@@ -1091,6 +1127,11 @@ public class ResourceConverter {
 	 * @return {@link Class}
 	 */
 	private Class<?> getActualType(JsonNode object, Class<?> userType) {
+		// always fallback to the type defined by the user if the node has not a type
+		if (!object.has(TYPE)) {
+			return userType;
+		}
+
 		String type = object.get(TYPE).asText();
 
 		String definedTypeName = configuration.getTypeName(userType);
